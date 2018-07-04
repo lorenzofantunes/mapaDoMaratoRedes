@@ -4,18 +4,22 @@ import database
 
 sessao = {
     'id': '12345',
-    'palavras': ['computacao', 'programadoreshtml'],
+    'palavras': ['macaco'],
     'onde': ('-31.781023', '-52.323445'),
     'quem': 'Lorenzo F. Antunes'
 }
 
 db, client = database.connect('maroto')
-session_id = database.insert(db, sessao)
-print(session_id)
+#session_id = database.insert(db, sessao)
+#print(session_id)
+
+for x in (database.pesquisarPorTempoEspacoPalavra(db, 100, -31.781023, -52.323445, ['computacao', 'macaco'])):
+    print(x)
 
 
+#####################################################################
 
-"""
+
 # Creating the server
 HOST = '127.0.0.1'     # Endereco IP do Servidor
 PORT = 5000            # Porta que o Servidor esta
@@ -32,4 +36,3 @@ while True:
     for palavra in msg['palavras']:
         print(palavra, ', ', end='')
 udp.close()
-"""
