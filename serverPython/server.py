@@ -24,6 +24,7 @@ db, client = database.connect('maroto')
 
 # Creating the server
 #HOST = '127.0.0.1'     # Endereco IP do Servidor
+#HOST = '189.27.148.91'     # Endereco IP do Servidor
 HOST = ''     # Endereco IP do Servidor
 PORT = 5000            # Porta que o Servidor esta
 udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -38,17 +39,10 @@ while True:
     msg['onde'] = ((pair[0]), (pair[1]))
 
     if isinstance(msg['palavras'], str):
-        msg['palavras'] = msg['palavras'].split()
+        msg['palavras'] = list(set(msg['palavras'].split()))
 
     session_id = database.insert(db, msg)
-    #print(session_id)
 
-    #print('Lat:', (msg['onde']['coordinates'][0]))
-    #print('Long:', (msg['onde']['coordinates'][1]))
-    #print('Palavras:', msg['palavras'])
-    #print(type(msg['palavras']))
-    #print((msg['palavras']))
-    #print(list(msg['palavras']))
     retorno = database.pesquisarPorTempoEspacoPalavra(db, 5, msg['onde']['coordinates'][0], msg['onde']['coordinates'][1], msg['palavras'], msg['nome'])
     pessoas = []
     for x in retorno:
@@ -61,7 +55,6 @@ while True:
         x['long'] = x['onde']['coordinates'][1]
         x.pop('onde', None)
         pessoas.append(x)
-        print(x)
 
     print('achou:', len(pessoas))
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
