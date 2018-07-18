@@ -10,80 +10,68 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
+import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 
-public class SendAsync extends AsyncTask<JSONObject, Integer, byte[]>{
+public class SendAsync extends AsyncTask<JSONObject, Integer, String>{
 //    JSONObject json;
     private String TAG = SendAsync.class.getSimpleName();
     private Activity activity;
-    private DatagramPacket recvedPack;
     public SendAsync(Activity activity) {
         this.activity = activity;
     }
 
     @Override
-    protected byte[] doInBackground(JSONObject... jsons) {
-        byte[] lMsg = new byte[1024];
-        Log.d(TAG, "SENDIND DATA");
+    protected String doInBackground(JSONObject... jsons) {
         JSONObject myLocJson = jsons[0];
-        try {
-            DatagramSocket mSocket = new DatagramSocket();
-            DatagramPacket packet = new DatagramPacket(myLocJson.toString().getBytes(), myLocJson.toString().getBytes().length,
-                    InetAddress.getByName("165.227.86.76"), 5000);
-//                    InetAddress.getByName("192.168.1.8"), 5000);
-            mSocket.send(packet);
-            mSocket.setSoTimeout(1000);
-            recvedPack = new DatagramPacket(lMsg, lMsg.length);
-            while(true){        // recieve data until timeout
-                try {
-                    mSocket.receive(recvedPack);
-                    Log.d(TAG, "recvedin back");
-                    return lMsg;
-                }
-                catch (SocketTimeoutException e) {
-                    // timeout exception.
-                    System.out.println("Timeout reached!!! " + e);
-                    mSocket.close();
-                }
-            }
+        String result = null;
 
-        } catch (SocketException e) {
-            e.printStackTrace();
-            return null;
+
+        try {
+            InetAddress inetAddress = InetAddress.getByName("165.227.86.76");
+            Socket socket = new Socket(inetAddress,  5000);
+
+            PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())),true);
+            out.println(myLocJson);
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String response = null;
+                response = in.readLine();
+            if(response != null)
+                return response;
+            socket.close();
         } catch (UnknownHostException e) {
             e.printStackTrace();
-            return null;
         } catch (IOException e) {
             e.printStackTrace();
-            return null;
         }
+    return null;
     }
-    protected void onPostExecute(byte[] result){Log.d(TAG, "receveid some data");
+
+    protected void onPostExecute(String result){
         Toast.makeText(activity, "Updating", Toast.LENGTH_SHORT).show();
         if(result == null){
             Log.d(TAG, "result is null");
             return;
         }
-        String pack = new String(result, 0, result.length);
-        if(pack.contains("_id")) {
-//            Log.d(TAG, pack);
-            Log.d(TAG, "Pack " +pack.substring(0, pack.lastIndexOf("}]") + 2));
-            try {
-                JSONArray jsonArray= new JSONArray(pack);
-                Log.d(TAG, jsonArray.toString());
-                ((MapsActivity) activity).showLocations(jsonArray);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-        }else{
-            Log.d(TAG, "RECEIVED NOTHING");
+        JSONArray jsonArray = null;
+        try {
+            jsonArray = new JSONArray(result);
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
-
+        Log.d(TAG, "ARRAY" + jsonArray.toString());
+        ((MapsActivity) activity).showLocations(jsonArray);
     }
 }

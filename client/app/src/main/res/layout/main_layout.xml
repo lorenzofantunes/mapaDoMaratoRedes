@@ -23,7 +23,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="end|bottom"
             android:layout_margin="@dimen/fab_margin"
-            android:backgroundTint="@color/colorPrimary"
+            app:backgroundTint="@color/colorPrimary"
             android:tint="#FFFFFF"
             app:srcCompat="@drawable/wand"
             tools:ignore="VectorDrawableCompat" />
