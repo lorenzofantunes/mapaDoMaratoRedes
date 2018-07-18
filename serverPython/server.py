@@ -1,57 +1,79 @@
 import socket
+import threading
 import json
 import database
-import threading
 from bson import Binary, Code
 from bson.json_util import dumps, CANONICAL_JSON_OPTIONS
 
-class UDP():
+def treatMSG(msg):
+    msg = str(msg.decode('utf-8'))
+    msg = json.loads(msg)
+    pair = msg['onde'].replace('Pair{', '').replace('}', '').split(', ')
+    msg['onde'] = ((pair[0]), (pair[1]))
 
-    def __init__(self, origin):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind((origin[0], origin[1]))
-        self.clients_list = []
+    if isinstance(msg['palavras'], str):
+        msg['palavras'] = list(set(msg['palavras'].split()))
 
-    def deal(self, msg, client):
-        print(msg)
-        msg = str(msg.decode())
-        msg = json.loads(msg)
-        pair = msg['onde'].replace('Pair{', '').replace('}', '').split(', ')
-        msg['onde'] = ((pair[0]), (pair[1]))
+    return msg
 
-        if isinstance(msg['palavras'], str):
-            msg['palavras'] = list(set(msg['palavras'].split()))
+def treatSearch(search, msg):
+    pessoas = []
+    for x in search:
+        palavras = []
+        for palavra in x['palavras']:
+            if (palavra in msg['palavras']):
+                palavras.append(palavra)
+        x['palavras'] = palavras
+        x['lat'] = x['onde']['coordinates'][0]
+        x['long'] = x['onde']['coordinates'][1]
+        x.pop('onde', None)
+        pessoas.append(x)
+
+    pessoas = dumps(pessoas, json_options=CANONICAL_JSON_OPTIONS)
+    print('SENT:', pessoas, '\n')
+    return bytes(pessoas, "utf-8")
+
+class TCP ():
+    def __init__(self, host, port):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind((host, port))
+        self.socket.listen(1)
+        #self.socket.settimeout(30)
+
+    def deal(self, conn, addr, data):
+        print(data)
+        msg = treatMSG(data)
 
         session_id = database.insert(db, msg)
 
         retorno = database.pesquisarPorTempoEspacoPalavra(db, 5, msg['onde']['coordinates'][0], msg['onde']['coordinates'][1], msg['palavras'], msg['nome'])
-        pessoas = []
-        for x in retorno:
-            palavras = []
-            for palavra in x['palavras']:
-                if (palavra in msg['palavras']):
-                    palavras.append(palavra)
-            x['palavras'] = palavras
-            x['lat'] = x['onde']['coordinates'][0]
-            x['long'] = x['onde']['coordinates'][1]
-            x.pop('onde', None)
-            pessoas.append(x)
 
-        print('achou:', len(pessoas))
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
-        pessoas = dumps(pessoas, json_options=CANONICAL_JSON_OPTIONS)
+        conn.sendall(treatSearch(retorno, msg))
 
-        sock.sendto(bytes(pessoas, "utf-8"), (client[0], client[1]))
+        conn.close()
 
     def start(self):
         while True:
-            msg, client = self.sock.recvfrom(1024)
-            t = threading.Thread(target=self.deal, args=(msg, client))
-            t.start()
+            try:
+                conn, addr = self.socket.accept()
+            except socket.timeout:
+                continue
+
+            while True:
+                data = conn.recv(1024)
+                if not data:
+                    conn.close()
+                    break
+                else:
+                    t = threading.Thread(target=self.deal, args=(conn, addr, data))
+                    t.start()
+                    break
 
 db, client = database.connect('maroto')
 
-HOST = ''     # Endereco IP do Servidor
+HOST = '165.227.86.76'
+PORT = 5000
 
-udp = UDP((HOST, 5000))
-udp.start()
+tcpServer = TCP(HOST, PORT)
+tcpServer.start()
