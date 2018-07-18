@@ -2,7 +2,9 @@ package com.example.vplentz.maraudersmapclient;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -38,12 +40,22 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashSet;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
+    private static final String NAME = "NAME";
+    private static final String PASSW = "PASSW";
 
     private static final String TAG = MapsActivity.class.getSimpleName();
     private static final int MY_PERMISSIONS_REQUEST_LOCATION = 1;
@@ -61,23 +73,26 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private Spinner mSpinner;
     private ArrayAdapter<String> mSpinnerArrayAdapter;
 
+    private DatagramSocket mSocket;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main_layout);
         mFab = findViewById(R.id.fab);
         mSpinner = findViewById(R.id.spinner);
-
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-
-        showNameDialog();
-
+        while (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
+                    MY_PERMISSIONS_REQUEST_LOCATION);
+        }
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(600000);//request location every 10 minutes
+        mLocationRequest.setInterval(60);//request location every 10 minutes
         mLocationCallback = new LocationCallback() {
             @Override
             public void onLocationResult(LocationResult locationResult) {
@@ -101,15 +116,23 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     JSONObject json = new JSONObject();
                     if (mPassWords.size() > 0) {
                         try {
-                            json.put("id", "00000");
-                            json.put("palavras", mPassWords);
-                            json.put("onde", new Pair<>(myLoc.latitude, myLoc.longitude));
+                            mMyself = mMyself.replaceAll(" ", "");
+                            mMyself = mMyself.toLowerCase();
+
+//                            json.put("palavras", mPassWords);
+                            for (String pass : mPassWords) {
+                                json.accumulate("palavras", pass);
+                            }
+                            json.put("onde", "Pair{" + myLoc.latitude + ", " + myLoc.longitude + "}");
                             json.put("nome", mMyself);
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
-
+//
                         Log.d(TAG, json.toString());
+                        Log.d(TAG, "lat:" + myLoc.latitude + "long" + myLoc.longitude);
+                        Log.d(TAG, "lengh" + json.toString().getBytes().length);
+                        new SendAsync(MapsActivity.this).execute(json);
                     }
 
 
@@ -117,9 +140,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
             }
 
-            ;
+
         };
         mPassWords = new ArrayList<>();
+
+        SharedPreferences sharedPref = getPreferences(Context.MODE_PRIVATE);
+        if (sharedPref.getString(NAME, null) != null)
+            mMyself = sharedPref.getString(NAME, null);
+        else
+            showNameDialog();
+
+        if (sharedPref.getStringSet(PASSW, null) != null){
+            mPassWords.addAll(sharedPref.getStringSet(PASSW, null));
+            startLocationUpdates();
+        }
         mFab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -202,6 +236,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 //do something with edt.getText().toString();
                 if (!edt.getText().toString().equals("")) {
                     mMyself = edt.getText().toString();
+                    SharedPreferences sharedPref = MapsActivity.this.getPreferences(Context.MODE_PRIVATE);
+                    SharedPreferences.Editor editor = sharedPref.edit();
+                    editor.putString(NAME, mMyself);
+                    editor.apply();
                 }
             }
         });
@@ -228,6 +266,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         mSpinnerArrayAdapter.notifyDataSetChanged();
                         mSpinner.setSelection(mPassWords.size() - 1);
                     }
+                    SharedPreferences sharedPref = MapsActivity.this.getPreferences(Context.MODE_PRIVATE);
+                    SharedPreferences.Editor editor = sharedPref.edit();
+                    editor.putStringSet(PASSW, new HashSet<String>(mPassWords));
+                    editor.apply();
+                    startLocationUpdates();
                     //TODO SHOULD REQUEST DATA FROM SOCKET
                 }
             });
@@ -267,5 +310,29 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             }
         });
+    }
+    public void showLocations(JSONArray jsonArray){
+        mMap.clear();
+        mMap.addMarker(mMyMarker).setIcon(BitmapDescriptorFactory.fromBitmap(getBitmapFromVectorDrawable(R.drawable.cloak)));
+        for(int i = 0; i < jsonArray.length(); i++){
+            try {
+
+                jsonArray.get(i);
+                Log.d(TAG, jsonArray.get(i).toString());
+                String lat = ((JSONObject)jsonArray.get(i)).get("lat").toString();
+                lat = lat.substring(lat.lastIndexOf(":\"")+2, lat.lastIndexOf("\"}")-1);
+                String lon = ((JSONObject)jsonArray.get(i)).get("long").toString();
+                lon = lon.substring(lon.lastIndexOf(":\"")+2, lon.lastIndexOf("\"}")-1);
+                LatLng myLoc = new LatLng(Double.parseDouble(lat),
+                        Double.parseDouble(lon));
+
+                MarkerOptions markerOptions = new MarkerOptions().position(myLoc).title(((JSONObject)jsonArray.get(i)).get("_id").toString());
+
+                mMap.addMarker(markerOptions).setIcon(BitmapDescriptorFactory.fromBitmap(getBitmapFromVectorDrawable(R.drawable.wand)));
+
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }
