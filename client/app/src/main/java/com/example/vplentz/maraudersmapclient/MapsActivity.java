@@ -18,7 +18,6 @@ import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.graphics.drawable.DrawableCompat;
 import android.util.Log;
-import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
@@ -45,11 +44,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
+import java.net.Socket;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashSet;
 
@@ -73,7 +70,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private Spinner mSpinner;
     private ArrayAdapter<String> mSpinnerArrayAdapter;
 
-    private DatagramSocket mSocket;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -133,6 +129,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         Log.d(TAG, "lat:" + myLoc.latitude + "long" + myLoc.longitude);
                         Log.d(TAG, "lengh" + json.toString().getBytes().length);
                         new SendAsync(MapsActivity.this).execute(json);
+
+
                     }
 
 
