@@ -18,10 +18,10 @@ def insert(db, session):
         ]
     }
     sessions = db.sessions
-    session_id = sessions.insert_one(session).inserted_id
+    session_id = sessions.update({'_id': session['nome']}, session, upsert=True)
     return session_id
 
-def pesquisarPorTempoEspacoPalavra(db, minutes, lat, longitude, words):
+def pesquisarPorTempoEspacoPalavra(db, minutes, lat, longitude, words, who):
     sessions = db.sessions
 
     return sessions.find(
@@ -29,6 +29,8 @@ def pesquisarPorTempoEspacoPalavra(db, minutes, lat, longitude, words):
             'quando': {
                 "$gt": datetime.datetime.now() - datetime.timedelta(minutes=minutes)
             },
-            'onde': {"$geoWithin": { "$centerSphere": [ [ lat, longitude ], 0.0621371/3963.2 ]}},
-            'palavras': {"$in": words }
-        })
+            #'onde': {"$geoWithin": { "$centerSphere": [ [ lat, longitude ], 0.0621371/3963.2 ]}},
+            #'onde': {"$geoWithin": { "$centerSphere": [ [ lat, longitude ], 0.0621371/3963.2 ]}},
+            'palavras': {"$in": words },
+            'nome': {"$ne": who}
+        }, {'_id': -1, 'onde': 1, 'palavras': 1})
