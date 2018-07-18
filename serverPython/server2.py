@@ -1,6 +1,34 @@
 import socket
 import threading
 
+
+def treatMSG(msg):
+    msg = str(msg.decode())
+    msg = json.loads(msg)
+    pair = msg['onde'].replace('Pair{', '').replace('}', '').split(', ')
+    msg['onde'] = ((pair[0]), (pair[1]))
+
+    if isinstance(msg['palavras'], str):
+        msg['palavras'] = list(set(msg['palavras'].split()))
+
+    return msg
+
+def treatSearch(search):
+    pessoas = []
+    for x in search:
+        palavras = []
+        for palavra in x['palavras']:
+            if (palavra in msg['palavras']):
+                palavras.append(palavra)
+        x['palavras'] = palavras
+        x['lat'] = x['onde']['coordinates'][0]
+        x['long'] = x['onde']['coordinates'][1]
+        x.pop('onde', None)
+        pessoas.append(x)
+
+        pessoas = dumps(pessoas, json_options=CANONICAL_JSON_OPTIONS)
+
+        return bytes(pessoas, "utf-8")
 class TCP ():
     def __init__(self, host, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -11,7 +39,15 @@ class TCP ():
 
     def deal(self, conn, addr, data):
         print(data)
-        conn.sendall(bytes('podecre'.encode()))
+        msg = treatMSG(msg)
+
+        session_id = database.insert(db, msg)
+
+        retorno = database.pesquisarPorTempoEspacoPalavra(db, 5, msg['onde']['coordinates'][0], msg['onde']['coordinates'][1], msg['palavras'], msg['nome'])
+
+        conn.sendall(treatSearch(retorno))
+        
+        conn.close()
 
     def start(self):
         while True:
@@ -20,16 +56,15 @@ class TCP ():
             except socket.timeout:
                 continue
 
-            #print(conn)
-            #print(addr)
-
-            # cria a thread
             while True:
                 data = conn.recv(1024)
-                if not data: break
-                            
-                t = threading.Thread(target=self.deal, args=(conn, addr, data))
-                t.start()
+                if not data:
+                    conn.close()
+                    break
+                else:
+                    t = threading.Thread(target=self.deal, args=(conn, addr, data))
+                    t.start()
+                    break
 
 HOST = '192.168.1.8'
 PORT = 5000
