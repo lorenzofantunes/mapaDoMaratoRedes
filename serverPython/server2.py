@@ -1,6 +1,9 @@
 import socket
 import threading
-
+import json
+import database
+from bson import Binary, Code
+from bson.json_util import dumps, CANONICAL_JSON_OPTIONS
 
 def treatMSG(msg):
     msg = str(msg.decode())
@@ -26,9 +29,10 @@ def treatSearch(search):
         x.pop('onde', None)
         pessoas.append(x)
 
-        pessoas = dumps(pessoas, json_options=CANONICAL_JSON_OPTIONS)
+    pessoas = dumps(pessoas, json_options=CANONICAL_JSON_OPTIONS)
 
-        return bytes(pessoas, "utf-8")
+    return bytes(pessoas, "utf-8")
+
 class TCP ():
     def __init__(self, host, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -39,14 +43,14 @@ class TCP ():
 
     def deal(self, conn, addr, data):
         print(data)
-        msg = treatMSG(msg)
+        msg = treatMSG(data)
 
         session_id = database.insert(db, msg)
 
         retorno = database.pesquisarPorTempoEspacoPalavra(db, 5, msg['onde']['coordinates'][0], msg['onde']['coordinates'][1], msg['palavras'], msg['nome'])
 
         conn.sendall(treatSearch(retorno))
-        
+
         conn.close()
 
     def start(self):
@@ -65,6 +69,8 @@ class TCP ():
                     t = threading.Thread(target=self.deal, args=(conn, addr, data))
                     t.start()
                     break
+
+db, client = database.connect('maroto')
 
 HOST = '192.168.1.8'
 PORT = 5000
