@@ -29,7 +29,7 @@ def pesquisarPorTempoEspacoPalavra(db, minutes, lat, longitude, words, who):
             'quando': {
                 "$gt": datetime.datetime.now() - datetime.timedelta(minutes=minutes)
             },
-            #'onde': {"$geoWithin": { "$centerSphere": [ [ lat, longitude ], 0.0621371/3963.2 ]}},
+            #'onde': {"$geoWithin": { "$centerSphere": [ [ lat, longitude ], 1.0621371/3963.2 ]}},
             #'onde': {"$geoWithin": { "$centerSphere": [ [ lat, longitude ], 0.0621371/3963.2 ]}},
             'palavras': {"$in": words },
             'nome': {"$ne": who}

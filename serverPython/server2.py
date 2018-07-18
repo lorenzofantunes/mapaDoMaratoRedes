@@ -6,7 +6,7 @@ from bson import Binary, Code
 from bson.json_util import dumps, CANONICAL_JSON_OPTIONS
 
 def treatMSG(msg):
-    msg = str(msg.decode())
+    msg = str(msg.decode('utf-8'))
     msg = json.loads(msg)
     pair = msg['onde'].replace('Pair{', '').replace('}', '').split(', ')
     msg['onde'] = ((pair[0]), (pair[1]))
@@ -16,7 +16,7 @@ def treatMSG(msg):
 
     return msg
 
-def treatSearch(search):
+def treatSearch(search, msg):
     pessoas = []
     for x in search:
         palavras = []
@@ -30,7 +30,7 @@ def treatSearch(search):
         pessoas.append(x)
 
     pessoas = dumps(pessoas, json_options=CANONICAL_JSON_OPTIONS)
-
+    print('SENT:', pessoas, '\n')
     return bytes(pessoas, "utf-8")
 
 class TCP ():
@@ -49,7 +49,7 @@ class TCP ():
 
         retorno = database.pesquisarPorTempoEspacoPalavra(db, 5, msg['onde']['coordinates'][0], msg['onde']['coordinates'][1], msg['palavras'], msg['nome'])
 
-        conn.sendall(treatSearch(retorno))
+        conn.sendall(treatSearch(retorno, msg))
 
         conn.close()
 
@@ -72,7 +72,7 @@ class TCP ():
 
 db, client = database.connect('maroto')
 
-HOST = '192.168.1.8'
+HOST = '165.227.86.76'
 PORT = 5000
 
 tcpServer = TCP(HOST, PORT)
